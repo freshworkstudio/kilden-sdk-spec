@@ -26,5 +26,5 @@ need a matching row in `SPEC.md` §10.
 
 ## Questions
 
-Use [Discussions](https://github.com/freshworkstudio/kilden-sdk-spec/discussions)
+Use [Discussions](https://github.com/kildenhq/kilden-sdk-spec/discussions)
 — answers there stay searchable, which is why we prefer them over chat.

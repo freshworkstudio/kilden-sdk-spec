@@ -21,5 +21,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `mockserver/`: zero-dependency Go mock of `/capture` and `/decide` with
   failure simulation, Docker image.
 
-[Unreleased]: https://github.com/freshworkstudio/kilden-sdk-spec/compare/v0.1.0-alpha.1...HEAD
-[0.1.0-alpha.1]: https://github.com/freshworkstudio/kilden-sdk-spec/releases/tag/v0.1.0-alpha.1
+[Unreleased]: https://github.com/kildenhq/kilden-sdk-spec/compare/v0.1.0-alpha.1...HEAD
+[0.1.0-alpha.1]: https://github.com/kildenhq/kilden-sdk-spec/releases/tag/v0.1.0-alpha.1

@@ -4,17 +4,17 @@
 
 # kilden-sdk-spec
 
-[![ci](https://github.com/freshworkstudio/kilden-sdk-spec/actions/workflows/ci.yml/badge.svg)](https://github.com/freshworkstudio/kilden-sdk-spec/actions/workflows/ci.yml)
-[![license](https://img.shields.io/github/license/freshworkstudio/kilden-sdk-spec)](LICENSE)
+[![ci](https://github.com/kildenhq/kilden-sdk-spec/actions/workflows/ci.yml/badge.svg)](https://github.com/kildenhq/kilden-sdk-spec/actions/workflows/ci.yml)
+[![license](https://img.shields.io/github/license/kildenhq/kilden-sdk-spec)](LICENSE)
 
 [Kilden](https://kilden.io) is a customer data platform — analytics,
 campaigns and session replay on one event pipeline. This repo is the
 **single source of truth** for its server-side SDKs
-([PHP](https://github.com/freshworkstudio/kilden-sdk-php),
-[Node](https://github.com/freshworkstudio/kilden-sdk-node),
-[Python](https://github.com/freshworkstudio/kilden-sdk-python),
-[Ruby](https://github.com/freshworkstudio/kilden-sdk-ruby),
-[Go](https://github.com/freshworkstudio/kilden-sdk-go)): one spec, one set
+([PHP](https://github.com/kildenhq/kilden-sdk-php),
+[Node](https://github.com/kildenhq/kilden-sdk-node),
+[Python](https://github.com/kildenhq/kilden-sdk-python),
+[Ruby](https://github.com/kildenhq/kilden-sdk-ruby),
+[Go](https://github.com/kildenhq/kilden-sdk-go)): one spec, one set
 of frozen test vectors, one mock server they all test against.
 
 Five SDKs drift apart the moment each one grows its own mocks and its own
@@ -64,7 +64,7 @@ file.
 
 ## Community
 
-- [Discussions](https://github.com/freshworkstudio/kilden-sdk-spec/discussions)
+- [Discussions](https://github.com/kildenhq/kilden-sdk-spec/discussions)
   for questions and design conversations (searchable, permanent).
 - [docs.kilden.io](https://docs.kilden.io) for the product documentation.
 
