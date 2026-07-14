@@ -320,7 +320,7 @@ of depending on one:
   the `traits` key is omitted entirely.
 - JSON: compact separators (no whitespace); UTF-8 preserved (no `\uXXXX`
   escaping of non-ASCII); the three HTML-unsafe ASCII characters `&`, `<`,
-  `>` escaped as `&`, `<`, `>` (this matches Go's
+  `>` escaped as `\u0026`, `\u003c`, `\u003e` (this matches Go's
   `encoding/json`, which the platform's reference generator uses); integers
   without decimal point or exponent.
 - base64url (RFC 4648 §5) **without padding** for all three segments.
@@ -353,14 +353,12 @@ ready-made:
   the platform: **facts**. That is the point of server-side revenue events.
 - The SDK never sends a JWT on `/capture` (contract 11) — the secret key
   outranks it.
-- `/decide` accepts **only public keys** platform-side; the server SDKs call
-  it with the secret key? No — see §8: the platform rejects secret keys on
-  `/decide` with 403 today. Server SDKs send the **write key they were
-  constructed with** and surface the documented error; the platform is
-  expected to accept secret keys on `/decide` for server-side evaluation
-  (tracked upstream). Until then, flag calls from server SDKs against
-  production return `default` and log the 403 — the mock server accepts the
-  secret key so vector runners exercise the full path.
+- `/decide` is called with the same secret key the client was constructed
+  with. The platform accepts secret keys on `/decide` only for requests
+  without a browser `Origin` header; a secret key arriving **with** an
+  `Origin` still gets the teaching 403 ("secret keys must never leave your
+  backend"). Server SDKs never set `Origin`, so this is invisible to them —
+  it exists so a leaked secret key in a browser stays a loud error.
 
 ## 8. Feature flags
 
@@ -457,7 +455,7 @@ failure mode of §4.3 on demand.
 | Endpoint | Behavior |
 |---|---|
 | `POST /capture` | full production validation (§4.1–§4.2 limits, gzip, timestamp format, canonical UUIDs); `200 {"status":"ok"}` |
-| `POST /decide` | §8.1, evaluated against flags configured via `/__mock/flags`; rejects secret… accepts both key classes (see §7) |
+| `POST /decide` | §8.1, evaluated against flags configured via `/__mock/flags`; accepts secret keys without `Origin`, 403s them with one (§7) |
 | `GET /healthz` | `200 ok` |
 | `GET /__mock/captured` | everything accepted so far: `{"batches":[…],"events":[…]}` |
 | `POST /__mock/reset` | wipe captured data, flags, failure queue, keys to defaults |
