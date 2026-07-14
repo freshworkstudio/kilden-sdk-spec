@@ -249,3 +249,256 @@ compressed bytes.
 already resolves to — mirror of the platform's resolver, where
 `distinct_id` must be the **existing** identity and `properties.$alias` the
 one being added. Both ids empty-checked per contract 4.
+
+## 5. Batching and delivery
+
+The queue is in-memory, per-process, bounded (contract 7). Delivery models:
+
+- **Node, Python, Ruby**: a background worker (thread / async task) drains
+  the queue every `flush_interval` seconds or when it reaches `flush_at`
+  events, whichever comes first.
+- **Go**: a goroutine, same policy.
+- **PHP**: no persistent process exists under FPM. The queue lives for the
+  request; flush happens on `flush_at`, on explicit `flush()`/`close()`, and
+  in a `register_shutdown_function` hook that calls
+  `fastcgi_finish_request()` first when available, so the customer's response
+  is not delayed by telemetry. Long-running PHP (Octane, CLI workers) behaves
+  like the worker model via the same code path.
+
+`flush()` drains **everything** queued at the moment of the call and blocks
+until delivery finishes (including retries) or fails terminally. `close()`
+is `flush()` with the 10-second deadline (contract 10) plus worker shutdown;
+calling it twice, or using the client after `close()`, is defined: subsequent
+events are dropped with a warning.
+
+Fork safety (contract 9) is a **check on every enqueue**: if `getpid()`
+differs from the PID captured at construction (or at the last reset), the
+inherited queue is discarded, the worker is restarted in the child, and the
+stored PID is updated. It must cost an integer comparison, not a syscall per
+event, where the platform allows caching (`os.getpid()` is cheap in both
+languages; caching the value is still required in Ruby where `Process.pid`
+is a syscall).
+
+## 6. Identity signing
+
+Identity verification (Kilden's trust model for browser events) needs the
+customer's backend to sign a short-lived JWT. Making that signature a
+three-line affair is a large part of why these SDKs exist. It is a separate
+class — a page-rendering controller wants a token, not an event queue:
+
+```php
+$signer = new Kilden\IdentitySigner(string $identitySecret, ['kid' => 'k1']);
+
+$token = $signer->sign(string $sub, [
+    'ttl'    => 3600,                       // seconds; default 3600, max 604800
+    'traits' => ['plan' => 'pro'],          // signed traits; optional
+]);
+```
+
+- `kid` is **required** — the platform looks the secret up by `kid` among the
+  project's active identity secrets; a token without a known `kid` fails
+  verification silently (`verified=false`).
+- `sub` is the `distinct_id` the token vouches for. The platform compares it
+  byte-for-byte with the event's `distinct_id`.
+- `iat` = now, `exp` = `iat + ttl`. `ttl` outside `(0, 604800]` → the signer
+  throws (it is construction-adjacent configuration, not hot path).
+- `traits` become **signed traits**: they override unsigned traits of the
+  same event during enrichment.
+
+### 6.1 Canonical JWT form (byte-frozen)
+
+A wrong signature fails **silently** (`verified=false`), so the vectors in
+[`vectors/identity.json`](vectors/identity.json) require byte-identical
+output across the five languages. That forces things JWT libraries usually
+leave open — which is why SDKs implement HS256 by hand (~25 lines) instead
+of depending on one:
+
+- Header: `{"alg":"HS256","kid":"<kid>","typ":"JWT"}` — exactly these three
+  fields, keys in that (lexicographic) order.
+- Payload: claim keys sorted lexicographically at **every** nesting level:
+  `exp`, `iat`, `sub`, then `traits` when present. Empty or absent traits →
+  the `traits` key is omitted entirely.
+- JSON: compact separators (no whitespace); UTF-8 preserved (no `\uXXXX`
+  escaping of non-ASCII); the three HTML-unsafe ASCII characters `&`, `<`,
+  `>` escaped as `&`, `<`, `>` (this matches Go's
+  `encoding/json`, which the platform's reference generator uses); integers
+  without decimal point or exponent.
+- base64url (RFC 4648 §5) **without padding** for all three segments.
+- Signature: `HMAC-SHA256(header_b64 + "." + payload_b64, utf8(secret))`.
+
+### 6.2 What the signer must refuse
+
+- Never expose the identity secret in any output, log or error message.
+- Documentation must carry the counterexample in bold: signing
+  `request.input('user_id')` lets anyone impersonate anyone — **only sign a
+  `sub` the backend authenticated**.
+- No infinite TTLs (hence the 7-day cap).
+
+### 6.3 The real deliverable: the endpoint
+
+The web SDK refreshes its token 60s before expiry and on 401, against an
+endpoint the customer's backend exposes. The framework packages ship it
+ready-made:
+
+- Laravel (`kilden/laravel`): publishable route `POST /kilden/identity`
+  behind the auth middleware, signing for `auth()->user()`.
+- WordPress: `GET /wp-json/kilden/v1/identity` (REST, cache-safe) returning
+  `{ distinct_id, token, traits }`.
+- Plain Express / FastAPI / Rails / net-http: documented examples, not
+  middleware.
+
+## 7. Trust model notes
+
+- Events sent with a secret key are `source=server` and `verified=true` on
+  the platform: **facts**. That is the point of server-side revenue events.
+- The SDK never sends a JWT on `/capture` (contract 11) — the secret key
+  outranks it.
+- `/decide` accepts **only public keys** platform-side; the server SDKs call
+  it with the secret key? No — see §8: the platform rejects secret keys on
+  `/decide` with 403 today. Server SDKs send the **write key they were
+  constructed with** and surface the documented error; the platform is
+  expected to accept secret keys on `/decide` for server-side evaluation
+  (tracked upstream). Until then, flag calls from server SDKs against
+  production return `default` and log the 403 — the mock server accepts the
+  secret key so vector runners exercise the full path.
+
+## 8. Feature flags
+
+v1 is **remote evaluation with a short cache**; the signature is already
+shaped for local evaluation later (§2.2).
+
+### 8.1 `POST {host}/decide`
+
+```json
+{ "write_key": "...", "distinct_id": "user_42",
+  "person_properties": { "plan": "pro" } }
+```
+
+`person_properties` key omitted when the caller passed none. Response:
+
+```json
+{ "flags": { "new_checkout": true, "exp_button": "variant_b", "off_flag": false },
+  "sessionRecording": { "enabled": false, "sampleRate": 0 } }
+```
+
+Server SDKs ignore `sessionRecording`. Every flag of the project is present
+in `flags`; a key **absent** from the map means the flag does not exist →
+return `default`.
+
+### 8.2 Client behavior
+
+- `getFeatureFlag` returns the raw value: `false`, `true`, or the variant
+  key (string). `isEnabled` returns `true` iff the value is `true` or a
+  string.
+- Cache: in-memory, keyed by `distinct_id`, holding the whole `flags` map of
+  the last `/decide` response for that id, TTL **30 seconds**, LRU-bounded at
+  **1000** distinct_ids. Calls with `person_properties` **bypass** the cache
+  entirely (no read, no write): overridden evaluations are not reusable.
+- Timeout: the client `timeout` option. On timeout, network error, non-200,
+  or malformed body: return `default`, log once per failure, never throw
+  (contract 1), and do not cache the failure.
+- Flag lookups never touch the event queue and are **not** retried — a flag
+  answer that arrives after the retry budget is useless to the caller.
+  One attempt, then `default`.
+- Server SDKs do **not** emit `$feature_flag_called` exposure events in v1
+  (deliberate: uncontrolled server-side volume; the browser SDK owns
+  exposure tracking today). When this changes it changes here first.
+
+### 8.3 Rollout hashing (frozen now, used later)
+
+Local evaluation will need every SDK to bucket users identically to the
+platform's `decide` service. The algorithm is frozen **today** in
+[`vectors/flag-hashing.json`](vectors/flag-hashing.json) even though v1
+never runs it locally:
+
+```
+bucket(flag_key, distinct_id) = u64_be(sha256(flag_key + ":" + distinct_id)[0..8)) / 2^64 * 100
+```
+
+- The hash input is the UTF-8 bytes of `flag_key`, one `:` (0x3A), and
+  `distinct_id`.
+- First 8 bytes of the SHA-256 digest as a **big-endian unsigned 64-bit**
+  integer, divided by 2^64 in IEEE 754 double precision, times 100 →
+  `[0, 100)`.
+- In rollout ⇔ `bucket < rollout_percentage` (strict).
+- Variants: an independent point from the same scheme with `":variant"`
+  appended to the input, walked over cumulative weights, first
+  `point < cumulative` wins.
+
+## 9. Test vectors
+
+Three files under [`vectors/`](vectors/). Every SDK ships a **runner** that
+consumes them verbatim in CI — the runner is part of the SDK's test suite,
+not an optional extra.
+
+- `payload.json` — SDK call → expected wire event, executed against the mock
+  server: build a client pointed at the mock, replay `call`, `flush()`, read
+  `GET /__mock/captured`, compare. Placeholders in `expect_event`:
+  `"<uuid_v7>"` must match `^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`,
+  `"<iso8601_utc_ms>"` must match `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$`.
+  Vectors with `"expect": "discarded"` assert the mock captured nothing.
+  Property comparison is deep structural equality after JSON parsing.
+- `identity.json` — `(secret, kid, sub, iat, exp, traits)` → exact JWT
+  string. Runners must compare the **whole token string**. Generated from
+  the platform's Go implementation; regenerating requires the kilden-core
+  generator (`scripts/specvectors`), never a hand edit.
+- `flag-hashing.json` — `(flag_key, distinct_id)` → hash uint64 (decimal
+  string — it exceeds 2^53, do not parse as a JSON number in JS), bucket
+  floor, and variant picks. Same provenance.
+
+## 10. Mock capture server
+
+`mockserver/` is a zero-dependency Go binary + Docker image that stands in
+for `ingest.kilden.io` in every SDK's CI. It validates requests with the
+same rules the production capture service enforces, records what it
+accepted, evaluates flags with the frozen hashing, and simulates every
+failure mode of §4.3 on demand.
+
+| Endpoint | Behavior |
+|---|---|
+| `POST /capture` | full production validation (§4.1–§4.2 limits, gzip, timestamp format, canonical UUIDs); `200 {"status":"ok"}` |
+| `POST /decide` | §8.1, evaluated against flags configured via `/__mock/flags`; rejects secret… accepts both key classes (see §7) |
+| `GET /healthz` | `200 ok` |
+| `GET /__mock/captured` | everything accepted so far: `{"batches":[…],"events":[…]}` |
+| `POST /__mock/reset` | wipe captured data, flags, failure queue, keys to defaults |
+| `POST /__mock/flags` | `{"flags":[{"key":…,"active":…,"rollout_percentage":…,"variants":[…]}]}` |
+| `POST /__mock/fail` | arm failures for the next N matching requests (below) |
+| `POST /__mock/keys` | `{"public":["wk_test_public"],"secret":["sk_test_secret"]}` (defaults shown) |
+| `POST /__mock/origins` | `{"origins":["https://allowed.example"]}` — empty = allow all |
+
+`/__mock/fail` body: `{"times": 2, "status": 429, "retry_after": 3}` for
+status simulation (any of 401/403/413/429/500…; `retry_after` optional), or
+`{"times": 1, "mode": "timeout", "delay_ms": 5000}`, `{"times": 1, "mode":
+"corrupt"}` (garbage body with 200), `{"times": 1, "mode": "cut"}`
+(connection closed mid-response). Failures apply to `/capture` and
+`/decide`, FIFO, then behavior returns to normal.
+
+The mock is **stricter** than production where the spec is stricter (exact
+timestamp shape, canonical-form UUIDs, no unknown payload keys): an SDK that
+passes here passes production, not vice versa.
+
+## 11. Versioning
+
+The spec, the vectors and the mock server version together (SemVer, tags on
+this repo). SDKs pin the spec version they implement in their README and CI
+checkout. Behavior changes bump minor pre-1.0; vector regeneration without
+behavior change is a patch.
+
+## 12. Idiom map
+
+| Concept | PHP | TypeScript | Python | Ruby | Go |
+|---|---|---|---|---|---|
+| construct | `new Client($key, [...])` | `new Client(key, {...})` | `Client(key, ...)` | `Client.new(key, ...)` | `New(key, opts ...Option)` |
+| `track` | `track` | `track` | `track` | `track` | `Track` |
+| `identify` | `identify` | `identify` | `identify` | `identify` | `Identify` |
+| `alias` | `alias` | `alias` | `alias` | `alias` | `Alias` |
+| `isEnabled` | `isEnabled` | `isEnabled` | `is_enabled` | `enabled?` | `IsEnabled` |
+| `getFeatureFlag` | `getFeatureFlag` | `getFeatureFlag` | `get_feature_flag` | `feature_flag` | `FeatureFlag` |
+| `flush` | `flush` | `flush` | `flush` | `flush` | `Flush` |
+| `close` | `close` | `close` | `close` | `close` | `Close` |
+| options | assoc array | object | kwargs | kwargs | functional options |
+| signer | `IdentitySigner` | `IdentitySigner` | `IdentitySigner` | `IdentitySigner` | `IdentitySigner` |
+
+Dynamic-language option keys are `snake_case` everywhere (`flush_at`,
+`person_properties`); TypeScript uses `camelCase` (`flushAt`,
+`personProperties`); Go encodes them as `WithFlushAt(20)`-style options.
