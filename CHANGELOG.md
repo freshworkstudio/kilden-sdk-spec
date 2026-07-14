@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-alpha.2] - 2026-07-14
+
+### Changed
+
+- Repository moved to the `kildenhq` org; mock server image now publishes
+  to `ghcr.io/kildenhq/kilden-mockserver`.
+
 ## [0.1.0-alpha.1] - 2026-07-14
 
 ### Added
@@ -21,5 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `mockserver/`: zero-dependency Go mock of `/capture` and `/decide` with
   failure simulation, Docker image.
 
-[Unreleased]: https://github.com/kildenhq/kilden-sdk-spec/compare/v0.1.0-alpha.1...HEAD
+[Unreleased]: https://github.com/kildenhq/kilden-sdk-spec/compare/v0.1.0-alpha.2...HEAD
+[0.1.0-alpha.2]: https://github.com/kildenhq/kilden-sdk-spec/compare/v0.1.0-alpha.1...v0.1.0-alpha.2
 [0.1.0-alpha.1]: https://github.com/kildenhq/kilden-sdk-spec/releases/tag/v0.1.0-alpha.1
