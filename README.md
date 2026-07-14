@@ -66,7 +66,7 @@ file.
 
 - [Discussions](https://github.com/kildenhq/kilden-sdk-spec/discussions)
   for questions and design conversations (searchable, permanent).
-- [docs.kilden.io](https://docs.kilden.io) for the product documentation.
+- [kilden.io/docs](https://kilden.io/docs) for the product documentation.
 
 ## License
 
