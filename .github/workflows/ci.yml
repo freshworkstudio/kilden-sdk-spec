@@ -7,7 +7,7 @@ on:
 
 jobs:
   mockserver:
-    runs-on: ubuntu-latest
+    runs-on: kilden-runners
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -21,7 +21,7 @@ jobs:
       - run: docker build -t kilden-mockserver mockserver/
 
   vectors:
-    runs-on: ubuntu-latest
+    runs-on: kilden-runners
     steps:
       - uses: actions/checkout@v4
       - name: vectors are valid JSON with the expected shape
