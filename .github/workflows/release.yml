@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   mockserver-image:
-    runs-on: ubuntu-latest
+    runs-on: kilden-runners
     steps:
       - uses: actions/checkout@v4
       - uses: docker/login-action@v3
