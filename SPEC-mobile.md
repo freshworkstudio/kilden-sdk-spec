@@ -198,7 +198,10 @@ rotates. Storage failure degrades to an in-memory decision.
   again → a **new recording** of the (possibly same) session.
 - Session rotation (§1) while recording → stop, then a new recording under
   the new session id. A chunk never crosses sessions.
-- `optOut()` → discard the buffer **without transmitting** and stop.
+- `optOut()` → discard **without transmitting** and stop: the in-memory
+  buffer is dropped, chunks queued for retry are abandoned, and an upload
+  mid-retry is never retried again. After opt-out, no retained replay data
+  may leave the device.
 
 ### 6.4 Capture
 
@@ -210,8 +213,12 @@ rotates. Storage failure degrades to an in-memory decision.
   return to foreground, and a **heartbeat ≥ 10 s** (a floor, never a
   target: an idle screen produces at most one frame per heartbeat).
 - Throttle: **≥ 1 s** between frames, always.
-- Dedup: a frame whose JPEG data-URI hashes (djb2) equal to the previous
-  frame's is dropped before it enters the stream.
+- Dedup applies to **same-screen frames only**: a frame whose JPEG data-URI
+  is byte-identical to the previous frame's (exact comparison, not a hash —
+  a collision must never discard a distinct frame) is dropped before it
+  enters the stream. A screen change is NEVER deduplicated: its Meta +
+  FullSnapshot (§6.5) are emitted even when the new screen renders
+  identical pixels.
 - Caps per recording: **300 frames** and **15 minutes** — whichever hits
   first stops the recording (tail flushed).
 
@@ -279,9 +286,12 @@ The web replay transport contract, plus one header:
   `X-Kilden-First-Event-At` / `X-Kilden-Last-Event-At` (epoch ms), and
   **`X-Kilden-Platform`: `ios` | `android`** (never any other value; web
   SDKs omit it).
-- Flush: **512 KB** of serialized events or **30 s**, whichever first;
-  retry with exponential backoff (the server is idempotent per
-  `(session, recording, chunk_index)`).
+- Flush: **512 KB** of serialized events or **30 s**, whichever first.
+  Size accounting is the serialized JSON's length; the threshold is checked
+  after each append, so a single event that alone exceeds it (a large
+  FullSnapshot) ships as its own immediately-flushed chunk — the hard bound
+  is the server's 4 MiB chunk cap. Retry with exponential backoff (the
+  server is idempotent per `(session, recording, chunk_index)`).
 - Any 2xx is success; the response body is never parsed (SPEC.md posture).
 
 ### 6.8 Test vectors
@@ -290,3 +300,9 @@ The web replay transport contract, plus one header:
 feeds a capture timeline (dims, frames, screen changes, touches, resizes)
 and lists the exact rrweb JSON the SDK must produce. Implementations MUST
 reproduce the vectors' output with deep equality.
+
+Vector inputs are **synthesizer-level events, after capture policy**: the
+recorder's triggers, throttle, dedup and caps (§6.4) run upstream and are
+NOT exercised by the vectors. In particular a `touch` input is only the
+click event itself — the capture a real touch may additionally trigger
+would arrive as its own later `frame` input once the throttle allows it.
