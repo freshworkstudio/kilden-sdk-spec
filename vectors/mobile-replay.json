@@ -1,0 +1,152 @@
+{
+  "description": "Synthetic rrweb stream for mobile visual replay (SPEC-mobile.md §6.5, format_version 1). Each case feeds the synthesizer a capture timeline and pins the exact rrweb events it must produce, byte-for-byte under deep equality. Node ids are pinned (document 1, html 2, head 3, body 4, img 5); numeric constants are rrweb's published enums (EventType Meta=4 Custom=5 FullSnapshot=2 IncrementalSnapshot=3; IncrementalSource Mutation=0 MouseInteraction=2 ViewportResize=4; MouseInteractions Click=2).",
+  "imgStyle": "width:100vw;height:100vh;object-fit:contain;background:#000",
+  "cases": [
+    {
+      "name": "recording_start_single_frame",
+      "input": {
+        "platform": "ios",
+        "sdkVersion": "0.3.0",
+        "width": 390,
+        "height": 844,
+        "initialScreen": "home",
+        "events": [
+          { "kind": "frame", "at": 1720000000000, "dataUri": "data:image/jpeg;base64,FRAME0" }
+        ]
+      },
+      "expected": [
+        { "type": 4, "data": { "href": "kilden-app://screen/home", "width": 390, "height": 844 }, "timestamp": 1720000000000 },
+        { "type": 5, "data": { "tag": "kilden_mobile_meta", "payload": { "format_version": 1, "platform": "ios", "sdk_version": "0.3.0" } }, "timestamp": 1720000000000 },
+        { "type": 2, "data": { "node": { "type": 0, "childNodes": [ { "type": 2, "tagName": "html", "attributes": {}, "childNodes": [ { "type": 2, "tagName": "head", "attributes": {}, "childNodes": [], "id": 3 }, { "type": 2, "tagName": "body", "attributes": {}, "childNodes": [ { "type": 2, "tagName": "img", "attributes": { "src": "data:image/jpeg;base64,FRAME0", "style": "width:100vw;height:100vh;object-fit:contain;background:#000" }, "childNodes": [], "id": 5 } ], "id": 4 } ], "id": 2 } ], "id": 1 }, "initialOffset": { "left": 0, "top": 0 } }, "timestamp": 1720000000000 }
+      ]
+    },
+    {
+      "name": "unknown_screen_before_any_navigation",
+      "input": {
+        "platform": "android",
+        "sdkVersion": "0.3.0",
+        "width": 412,
+        "height": 915,
+        "initialScreen": null,
+        "events": [
+          { "kind": "frame", "at": 1720000000000, "dataUri": "data:image/jpeg;base64,FRAME0" }
+        ]
+      },
+      "expected": [
+        { "type": 4, "data": { "href": "kilden-app://screen/unknown", "width": 412, "height": 915 }, "timestamp": 1720000000000 },
+        { "type": 5, "data": { "tag": "kilden_mobile_meta", "payload": { "format_version": 1, "platform": "android", "sdk_version": "0.3.0" } }, "timestamp": 1720000000000 },
+        { "type": 2, "data": { "node": { "type": 0, "childNodes": [ { "type": 2, "tagName": "html", "attributes": {}, "childNodes": [ { "type": 2, "tagName": "head", "attributes": {}, "childNodes": [], "id": 3 }, { "type": 2, "tagName": "body", "attributes": {}, "childNodes": [ { "type": 2, "tagName": "img", "attributes": { "src": "data:image/jpeg;base64,FRAME0", "style": "width:100vw;height:100vh;object-fit:contain;background:#000" }, "childNodes": [], "id": 5 } ], "id": 4 } ], "id": 2 } ], "id": 1 }, "initialOffset": { "left": 0, "top": 0 } }, "timestamp": 1720000000000 }
+      ]
+    },
+    {
+      "name": "same_screen_frame_mutates_the_img",
+      "input": {
+        "platform": "ios",
+        "sdkVersion": "0.3.0",
+        "width": 390,
+        "height": 844,
+        "initialScreen": "home",
+        "events": [
+          { "kind": "frame", "at": 1720000000000, "dataUri": "data:image/jpeg;base64,FRAME0" },
+          { "kind": "frame", "at": 1720000011000, "dataUri": "data:image/jpeg;base64,FRAME1" }
+        ]
+      },
+      "expected": [
+        { "type": 4, "data": { "href": "kilden-app://screen/home", "width": 390, "height": 844 }, "timestamp": 1720000000000 },
+        { "type": 5, "data": { "tag": "kilden_mobile_meta", "payload": { "format_version": 1, "platform": "ios", "sdk_version": "0.3.0" } }, "timestamp": 1720000000000 },
+        { "type": 2, "data": { "node": { "type": 0, "childNodes": [ { "type": 2, "tagName": "html", "attributes": {}, "childNodes": [ { "type": 2, "tagName": "head", "attributes": {}, "childNodes": [], "id": 3 }, { "type": 2, "tagName": "body", "attributes": {}, "childNodes": [ { "type": 2, "tagName": "img", "attributes": { "src": "data:image/jpeg;base64,FRAME0", "style": "width:100vw;height:100vh;object-fit:contain;background:#000" }, "childNodes": [], "id": 5 } ], "id": 4 } ], "id": 2 } ], "id": 1 }, "initialOffset": { "left": 0, "top": 0 } }, "timestamp": 1720000000000 },
+        { "type": 3, "data": { "source": 0, "texts": [], "attributes": [ { "id": 5, "attributes": { "src": "data:image/jpeg;base64,FRAME1" } } ], "removes": [], "adds": [] }, "timestamp": 1720000011000 }
+      ]
+    },
+    {
+      "name": "screen_change_emits_meta_and_fullsnapshot",
+      "input": {
+        "platform": "ios",
+        "sdkVersion": "0.3.0",
+        "width": 390,
+        "height": 844,
+        "initialScreen": "home",
+        "events": [
+          { "kind": "frame", "at": 1720000000000, "dataUri": "data:image/jpeg;base64,FRAME0" },
+          { "kind": "screenChange", "at": 1720000005000, "screen": "checkout", "dataUri": "data:image/jpeg;base64,FRAME1" }
+        ]
+      },
+      "expected": [
+        { "type": 4, "data": { "href": "kilden-app://screen/home", "width": 390, "height": 844 }, "timestamp": 1720000000000 },
+        { "type": 5, "data": { "tag": "kilden_mobile_meta", "payload": { "format_version": 1, "platform": "ios", "sdk_version": "0.3.0" } }, "timestamp": 1720000000000 },
+        { "type": 2, "data": { "node": { "type": 0, "childNodes": [ { "type": 2, "tagName": "html", "attributes": {}, "childNodes": [ { "type": 2, "tagName": "head", "attributes": {}, "childNodes": [], "id": 3 }, { "type": 2, "tagName": "body", "attributes": {}, "childNodes": [ { "type": 2, "tagName": "img", "attributes": { "src": "data:image/jpeg;base64,FRAME0", "style": "width:100vw;height:100vh;object-fit:contain;background:#000" }, "childNodes": [], "id": 5 } ], "id": 4 } ], "id": 2 } ], "id": 1 }, "initialOffset": { "left": 0, "top": 0 } }, "timestamp": 1720000000000 },
+        { "type": 4, "data": { "href": "kilden-app://screen/checkout", "width": 390, "height": 844 }, "timestamp": 1720000005000 },
+        { "type": 2, "data": { "node": { "type": 0, "childNodes": [ { "type": 2, "tagName": "html", "attributes": {}, "childNodes": [ { "type": 2, "tagName": "head", "attributes": {}, "childNodes": [], "id": 3 }, { "type": 2, "tagName": "body", "attributes": {}, "childNodes": [ { "type": 2, "tagName": "img", "attributes": { "src": "data:image/jpeg;base64,FRAME1", "style": "width:100vw;height:100vh;object-fit:contain;background:#000" }, "childNodes": [], "id": 5 } ], "id": 4 } ], "id": 2 } ], "id": 1 }, "initialOffset": { "left": 0, "top": 0 } }, "timestamp": 1720000005000 }
+      ]
+    },
+    {
+      "name": "touch_becomes_a_click_on_the_img",
+      "input": {
+        "platform": "android",
+        "sdkVersion": "0.3.0",
+        "width": 412,
+        "height": 915,
+        "initialScreen": "home",
+        "events": [
+          { "kind": "frame", "at": 1720000000000, "dataUri": "data:image/jpeg;base64,FRAME0" },
+          { "kind": "touch", "at": 1720000002000, "x": 100.6, "y": 200.2 }
+        ]
+      },
+      "expected": [
+        { "type": 4, "data": { "href": "kilden-app://screen/home", "width": 412, "height": 915 }, "timestamp": 1720000000000 },
+        { "type": 5, "data": { "tag": "kilden_mobile_meta", "payload": { "format_version": 1, "platform": "android", "sdk_version": "0.3.0" } }, "timestamp": 1720000000000 },
+        { "type": 2, "data": { "node": { "type": 0, "childNodes": [ { "type": 2, "tagName": "html", "attributes": {}, "childNodes": [ { "type": 2, "tagName": "head", "attributes": {}, "childNodes": [], "id": 3 }, { "type": 2, "tagName": "body", "attributes": {}, "childNodes": [ { "type": 2, "tagName": "img", "attributes": { "src": "data:image/jpeg;base64,FRAME0", "style": "width:100vw;height:100vh;object-fit:contain;background:#000" }, "childNodes": [], "id": 5 } ], "id": 4 } ], "id": 2 } ], "id": 1 }, "initialOffset": { "left": 0, "top": 0 } }, "timestamp": 1720000000000 },
+        { "type": 3, "data": { "source": 2, "type": 2, "id": 5, "x": 101, "y": 200 }, "timestamp": 1720000002000 }
+      ]
+    },
+    {
+      "name": "rotation_emits_viewport_resize",
+      "input": {
+        "platform": "ios",
+        "sdkVersion": "0.3.0",
+        "width": 390,
+        "height": 844,
+        "initialScreen": "player",
+        "events": [
+          { "kind": "frame", "at": 1720000000000, "dataUri": "data:image/jpeg;base64,FRAME0" },
+          { "kind": "resize", "at": 1720000003000, "width": 844, "height": 390 },
+          { "kind": "frame", "at": 1720000004000, "dataUri": "data:image/jpeg;base64,FRAME1" }
+        ]
+      },
+      "expected": [
+        { "type": 4, "data": { "href": "kilden-app://screen/player", "width": 390, "height": 844 }, "timestamp": 1720000000000 },
+        { "type": 5, "data": { "tag": "kilden_mobile_meta", "payload": { "format_version": 1, "platform": "ios", "sdk_version": "0.3.0" } }, "timestamp": 1720000000000 },
+        { "type": 2, "data": { "node": { "type": 0, "childNodes": [ { "type": 2, "tagName": "html", "attributes": {}, "childNodes": [ { "type": 2, "tagName": "head", "attributes": {}, "childNodes": [], "id": 3 }, { "type": 2, "tagName": "body", "attributes": {}, "childNodes": [ { "type": 2, "tagName": "img", "attributes": { "src": "data:image/jpeg;base64,FRAME0", "style": "width:100vw;height:100vh;object-fit:contain;background:#000" }, "childNodes": [], "id": 5 } ], "id": 4 } ], "id": 2 } ], "id": 1 }, "initialOffset": { "left": 0, "top": 0 } }, "timestamp": 1720000000000 },
+        { "type": 3, "data": { "source": 4, "width": 844, "height": 390 }, "timestamp": 1720000003000 },
+        { "type": 3, "data": { "source": 0, "texts": [], "attributes": [ { "id": 5, "attributes": { "src": "data:image/jpeg;base64,FRAME1" } } ], "removes": [], "adds": [] }, "timestamp": 1720000004000 }
+      ]
+    },
+    {
+      "name": "full_timeline",
+      "input": {
+        "platform": "ios",
+        "sdkVersion": "0.3.0",
+        "width": 390,
+        "height": 844,
+        "initialScreen": "home",
+        "events": [
+          { "kind": "frame", "at": 1720000000000, "dataUri": "data:image/jpeg;base64,FRAME0" },
+          { "kind": "touch", "at": 1720000001500, "x": 195, "y": 700 },
+          { "kind": "screenChange", "at": 1720000002000, "screen": "product/[id]", "dataUri": "data:image/jpeg;base64,FRAME1" },
+          { "kind": "frame", "at": 1720000013000, "dataUri": "data:image/jpeg;base64,FRAME2" },
+          { "kind": "resize", "at": 1720000014000, "width": 844, "height": 390 }
+        ]
+      },
+      "expected": [
+        { "type": 4, "data": { "href": "kilden-app://screen/home", "width": 390, "height": 844 }, "timestamp": 1720000000000 },
+        { "type": 5, "data": { "tag": "kilden_mobile_meta", "payload": { "format_version": 1, "platform": "ios", "sdk_version": "0.3.0" } }, "timestamp": 1720000000000 },
+        { "type": 2, "data": { "node": { "type": 0, "childNodes": [ { "type": 2, "tagName": "html", "attributes": {}, "childNodes": [ { "type": 2, "tagName": "head", "attributes": {}, "childNodes": [], "id": 3 }, { "type": 2, "tagName": "body", "attributes": {}, "childNodes": [ { "type": 2, "tagName": "img", "attributes": { "src": "data:image/jpeg;base64,FRAME0", "style": "width:100vw;height:100vh;object-fit:contain;background:#000" }, "childNodes": [], "id": 5 } ], "id": 4 } ], "id": 2 } ], "id": 1 }, "initialOffset": { "left": 0, "top": 0 } }, "timestamp": 1720000000000 },
+        { "type": 3, "data": { "source": 2, "type": 2, "id": 5, "x": 195, "y": 700 }, "timestamp": 1720000001500 },
+        { "type": 4, "data": { "href": "kilden-app://screen/product/[id]", "width": 390, "height": 844 }, "timestamp": 1720000002000 },
+        { "type": 2, "data": { "node": { "type": 0, "childNodes": [ { "type": 2, "tagName": "html", "attributes": {}, "childNodes": [ { "type": 2, "tagName": "head", "attributes": {}, "childNodes": [], "id": 3 }, { "type": 2, "tagName": "body", "attributes": {}, "childNodes": [ { "type": 2, "tagName": "img", "attributes": { "src": "data:image/jpeg;base64,FRAME1", "style": "width:100vw;height:100vh;object-fit:contain;background:#000" }, "childNodes": [], "id": 5 } ], "id": 4 } ], "id": 2 } ], "id": 1 }, "initialOffset": { "left": 0, "top": 0 } }, "timestamp": 1720000002000 },
+        { "type": 3, "data": { "source": 0, "texts": [], "attributes": [ { "id": 5, "attributes": { "src": "data:image/jpeg;base64,FRAME2" } } ], "removes": [], "adds": [] }, "timestamp": 1720000013000 },
+        { "type": 3, "data": { "source": 4, "width": 844, "height": 390 }, "timestamp": 1720000014000 }
+      ]
+    }
+  ]
+}

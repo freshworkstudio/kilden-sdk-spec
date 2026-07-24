@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `SPEC-mobile.md` §5.1 + §6: **mobile visual replay** (expo-2) — the
+  `sessionRecording.mobile` sub-block parsing rules, and the screenshot
+  slideshow contract (`format_version: 1`): gates (dev opt-in + server gate
+  + sticky sampling), recording lifecycle, capture rules (dp space, JPEG
+  q0.35, heartbeat ≥10 s, hash dedup, 300 frames / 15 min caps), the
+  synthetic rrweb stream (pinned node ids, Meta + `kilden_mobile_meta` +
+  FullSnapshot, mutation frames, screen changes as Meta+FullSnapshot,
+  touches as Click, ViewportResize), privacy controls (`<Kilden.Mask>`
+  with pixels-blacked-before-upload and fail-closed measurement, denylist,
+  pause/resume) and the chunk transport (+`X-Kilden-Platform`).
+- `vectors/mobile-replay.json`: byte-exact synthesis vectors for §6.5.
+
 - `SPEC-mobile.md`: mobile client SDK spec (Expo / React Native) — the
   mobile-session surface: `$session_id` (UUID v7, 30-minute inactivity
   rotation), `$screen`/`$screen_name` (static route names, never resolved
